@@ -206,16 +206,20 @@ class PathPlanningWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
     def onApplyButton(self) -> None:
         """Run processing when user clicks "Apply" button."""
         # First initialise the logic
-        logic = PathPlanningLogic()
+        self.logic = PathPlanningLogic()
         # Set class parameters
-        logic.SetEntryPoints(self.ui.inputEntryFiducialSelector.currentNode())
-        logic.SetTargetPoints(self.ui.inputTargetFiducialSelector.currentNode())
-        logic.SetOutputPoints(self.ui.outputFiducialSelector.currentNode())
-        logic.SetInputTargetImage(self.ui.inputTargetVolumeSelector.currentNode())
+        self.logic.SetEntryPoints(self.ui.inputEntryFiducialSelector.currentNode())
+        self.logic.SetTargetPoints(self.ui.inputTargetFiducialSelector.currentNode())
+        self.logic.SetOutputPoints(self.ui.outputFiducialSelector.currentNode())
+        self.logic.SetInputTargetImage(self.ui.inputTargetVolumeSelector.currentNode())
         # finally try to run the code. Return false if the code did not run properly
-        complete = logic.run()
+        complete = self.logic.run()
 
-        # print out an error message if the code returned false
+        if complete:
+           criticalVolume = self.ui.inputCriticalVolumeSelector.currentNode()
+           pointPicker = PickPointsMatrix()
+           pointPicker.GetLinesE_T(self.logic.myEntries, self.logic.myOutputs, "lineNodes", criticalVolume)
+
         if not complete:
             print('I encountered an error')
 
@@ -236,7 +240,7 @@ class PathPlanningLogic(ScriptedLoadableModuleLogic):
     https://github.com/Slicer/Slicer/blob/main/Base/Python/slicer/ScriptedLoadableModule.py
     """
 
-    def __init__(self) -> None:
+    def __init__(self):
         """Called when the logic class is instantiated. Can be used for initializing member variables."""
         ScriptedLoadableModuleLogic.__init__(self)
 
@@ -257,10 +261,6 @@ class PathPlanningLogic(ScriptedLoadableModuleLogic):
       self.myOutputs = outputNode
 
     def hasImageData(self, volumeNode):
-      """This is an example logic method that
-      returns true if the passed in volume
-      node has valid image data
-      """
       if not volumeNode:
         logging.debug('hasImageData failed: no volume node')
         return False
@@ -313,7 +313,7 @@ class PathPlanningLogic(ScriptedLoadableModuleLogic):
         return True
 
 
-class PickPointsMatrix(): 
+class PickPointsMatrix(ScriptedLoadableModuleLogic): 
   def run(self, inputVolume, inputFiducials, outputFiducials):
     # So at the moment we have our boilerplate UI to take in an image and set of figudicals and output another set of fiducials
     # And are just printing something silly in our main call
