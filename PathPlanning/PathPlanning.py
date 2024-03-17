@@ -220,6 +220,9 @@ class PathPlanningWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
            pointPicker = PickPointsMatrix()
            pointPicker.GetLinesE_T(self.logic.myEntries, self.logic.myOutputs, "lineNodes", criticalVolume)
 
+        if self.ui.inputTargetFiducialSelector.currentNode():
+          self.ui.inputTargetFiducialSelector.currentNode().SetDisplayVisibility(False)
+
         if not complete:
             print('I encountered an error')
 
