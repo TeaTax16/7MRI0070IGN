@@ -15,7 +15,6 @@ from slicer.parameterNodeWrapper import (parameterNodeWrapper, WithinRange)
 
 from slicer import vtkMRMLLabelMapVolumeNode, vtkMRMLMarkupsFiducialNode
 
-
 #
 # PathPlanning
 #
@@ -28,17 +27,13 @@ class PathPlanning(ScriptedLoadableModule):
 
     def __init__(self, parent):
         ScriptedLoadableModule.__init__(self, parent)
-        self.parent.title = _("PathPlanning")  # TODO: make this more human readable by adding spaces
-        # TODO: set categories (folders where the module shows up in the module selector)
+        self.parent.title = _("PathPlanning")
         self.parent.categories = [translate("qSlicerAbstractCoreModule", "Examples")]
-        self.parent.dependencies = []  # TODO: add here list of module names that this module requires
-        self.parent.contributors = ["Takrim Titas (King's College London)"]  # TODO: replace with "Firstname Lastname (Organization)"
-        # TODO: update with short description of the module and a link to online module documentation
-        # _() function marks text as translatable to other languages
+        self.parent.dependencies = []
+        self.parent.contributors = ["Takrim Titas (King's College London)"]
         self.parent.helpText = _("""
 This is the start of the path planning script with some helpers already implemented
 """)
-        # TODO: replace with organization, grant and thanks
         self.parent.acknowledgementText = _("""
 This file was originally developed by Jean-Christophe Fillion-Robin, Kitware Inc., Andras Lasso, PerkLab,
 and Steve Pieper, Isomics, Inc. and was partially funded by NIH grant 3P41RR013218-12S1.  Rachel Sparks has modified this, 
@@ -117,7 +112,6 @@ class PathPlanningWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
 
         # Buttons
         self.ui.applyButton.clicked.connect(self.onApplyButton)
-
 
         # Make sure parameter node is initialized (needed for module reload)
         self.initializeParameterNode()
@@ -212,20 +206,21 @@ class PathPlanningWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         self.logic.SetTargetPoints(self.ui.inputTargetFiducialSelector.currentNode())
         self.logic.SetOutputPoints(self.ui.outputFiducialSelector.currentNode())
         self.logic.SetInputTargetImage(self.ui.inputTargetVolumeSelector.currentNode())
+        self.logic.SetInputCriticalVolume(self.ui.inputCriticalVolumeSelector.currentNode())
+        self.logic.SetLengthThreshold(self.ui.lengthThreshold.value)
         # finally try to run the code. Return false if the code did not run properly
         complete = self.logic.run()
 
         if complete:
-           criticalVolume = self.ui.inputCriticalVolumeSelector.currentNode()
-           pointPicker = PickPointsMatrix()
-           pointPicker.GetLinesE_T(self.logic.myEntries, self.logic.myOutputs, "lineNodes", criticalVolume)
+            criticalVolume = self.ui.inputCriticalVolumeSelector.currentNode()
+            pointPicker = PickPointsMatrix()
+            pointPicker.GetLinesE_T(self.logic.myEntries, self.logic.myOutputs, "lineNodes", criticalVolume, self.logic.lengthThreshold)
 
         if self.ui.inputTargetFiducialSelector.currentNode():
-          self.ui.inputTargetFiducialSelector.currentNode().SetDisplayVisibility(False)
+            self.ui.inputTargetFiducialSelector.currentNode().SetDisplayVisibility(False)
 
         if not complete:
             print('I encountered an error')
-
 
 
 #
@@ -251,57 +246,66 @@ class PathPlanningLogic(ScriptedLoadableModuleLogic):
         return PathPlanningParameterNode(super().getParameterNode())
 
     def SetEntryPoints(self, entryNode):
-      self.myEntries = entryNode
+        self.myEntries = entryNode
 
     def SetTargetPoints(self, targetNode):
-      self.myTargets = targetNode
+        self.myTargets = targetNode
 
     def SetInputTargetImage(self, imageNode):
         if (self.hasImageData(imageNode)):
-          self.myTargetImage = imageNode
+            self.myTargetImage = imageNode
+
+    def SetInputCriticalVolume(self, criticalVolumeNode):
+        self.myCriticalVolume = criticalVolumeNode
 
     def SetOutputPoints(self, outputNode):
-      self.myOutputs = outputNode
+        self.myOutputs = outputNode
+
+    def SetLengthThreshold(self, lengthThreshold):
+        self.lengthThreshold = lengthThreshold
 
     def hasImageData(self, volumeNode):
-      if not volumeNode:
-        logging.debug('hasImageData failed: no volume node')
-        return False
-      if volumeNode.GetImageData() is None:
-        logging.debug('hasImageData failed: no image data in volume node')
-        return False
-      return True
+        if not volumeNode:
+            logging.debug('hasImageData failed: no volume node')
+            return False
+        if volumeNode.GetImageData() is None:
+            logging.debug('hasImageData failed: no image data in volume node')
+            return False
+        return True
 
-    def isValidInputOutputData(self, inputTargetVolumeNode, inputTargetFiducialsNode, inputEntryFiducialsNodes, outputFiducialsNode):
-      """Validates if the output is not the same as input
-      """
-      if not inputTargetVolumeNode:
-        logging.debug('isValidInputOutputData failed: no input target volume node defined')
-        return False
-      if not inputTargetFiducialsNode:
-        logging.debug('isValidInputOutputData failed: no input target fiducials node defined')
-        return False
-      if not inputEntryFiducialsNodes:
-        logging.debug('isValidInputOutputData failed: no input entry fiducials node defined')
-        return False
-      if not outputFiducialsNode:
-        logging.debug('isValidInputOutputData failed: no output fiducials node defined')
-        return False
-      if inputTargetFiducialsNode.GetID()==outputFiducialsNode.GetID():
-        logging.debug('isValidInputOutputData failed: input and output fiducial nodes are the same. Create a new output to avoid this error.')
-        return False
-      return True
+    def isValidInputOutputData(self, inputTargetVolumeNode, inputCriticalVolumeNode, inputTargetFiducialsNode, inputEntryFiducialsNode, outputFiducialsNode):
+        """Validates if the output is not the same as input
+        """
+        if not inputTargetVolumeNode:
+            logging.debug('isValidInputOutputData failed: no input target volume node defined')
+            return False
+        if not inputCriticalVolumeNode:
+            logging.debug('isValidInputOutputData failed: no input critical volume node defined')
+            return False
+        if not inputTargetFiducialsNode:
+            logging.debug('isValidInputOutputData failed: no input target fiducials node defined')
+            return False
+        if not inputEntryFiducialsNode:
+            logging.debug('isValidInputOutputData failed: no input entry fiducials node defined')
+            return False
+        if not outputFiducialsNode:
+            logging.debug('isValidInputOutputData failed: no output fiducials node defined')
+            return False
+        if inputTargetFiducialsNode.GetID() == outputFiducialsNode.GetID():
+            logging.debug('isValidInputOutputData failed: input and output fiducial nodes are the same. Create a new output to avoid this error.')
+            return False
+        return True
 
     def run(self):
         """
         Run the path planning algorithm.
         """
 
-        if not self.isValidInputOutputData(self.myTargetImage, self.myTargets, self.myEntries, self.myOutputs):
-          slicer.util.errorDisplay('Not all inputs are set.')
-          return False
+        if not self.isValidInputOutputData(self.myTargetImage, self.myCriticalVolume, self.myTargets, self.myEntries, self.myOutputs):
+            slicer.util.errorDisplay('Not all inputs are set.')
+            return False
         if not self.hasImageData(self.myTargetImage):
-            raise ValueError("Input target volume is not appropriatelly defined.")
+            raise ValueError("Input target volume is not appropriately defined.")
 
         import time
 
@@ -317,84 +321,132 @@ class PathPlanningLogic(ScriptedLoadableModuleLogic):
 
 
 class PickPointsMatrix(ScriptedLoadableModuleLogic): 
-  def run(self, inputVolume, inputFiducials, outputFiducials):
-    # So at the moment we have our boilerplate UI to take in an image and set of figudicals and output another set of fiducials
-    # And are just printing something silly in our main call
-    # In this first instance (related to task a) we are going to find the set of input fiducials that are within a mask of our input volume
-    # First bit of clean up is to remove all points from the output-- otherwise rerunning will duplicate these
-    outputFiducials.RemoveAllControlPoints()
-    # we can get a transformation from our input volume
-    mat = vtk.vtkMatrix4x4();
-    inputVolume.GetRASToIJKMatrix(mat)
-    
-    # set it to a transform type
-    transform = vtk.vtkTransform()
-    transform.SetMatrix(mat)
+    def run(self, inputVolume, inputFiducials, outputFiducials):
+        outputFiducials.RemoveAllControlPoints()
+        mat = vtk.vtkMatrix4x4()
+        inputVolume.GetRASToIJKMatrix(mat)
+        transform = vtk.vtkTransform()
+        transform.SetMatrix(mat)
 
-    for x in range(0, inputFiducials.GetNumberOfControlPoints()):
-      pos = [0,0,0]
-      inputFiducials.GetNthControlPointPosition(x, pos)
-      # get index from position using our transformation
-      ind = transform.TransformPoint(pos)
+        for x in range(inputFiducials.GetNumberOfControlPoints()):
+            pos = [0, 0, 0]
+            inputFiducials.GetNthControlPointPosition(x, pos)
+            # get index from position using our transformation
+            ind = transform.TransformPoint(pos)
 
-      # get pixel using that index
-      pixelValue = inputVolume.GetImageData().GetScalarComponentAsDouble (int(ind[0]), int(ind[1]), int(ind[2]), 0) #looks like it needs 4 ints -- our x,y,z index and a component index (which is 0)
-      if (pixelValue == 1):
-        outputFiducials.AddControlPoint(pos[0], pos[1], pos[2])
+            # get pixel using that index
+            pixelValue = inputVolume.GetImageData().GetScalarComponentAsDouble(int(ind[0]), int(ind[1]), int(ind[2]), 0)  # looks like it needs 4 ints -- our x,y,z index and a component index (which is 0)
+            if pixelValue == 1:
+                outputFiducials.AddControlPoint(pos[0], pos[1], pos[2])
 
+    def GetLinesE_T(self, inputEntryFiducials, outputFiducials, groupName, CriticalVolume, lengthThreshold):
+        # Pre-create a lineNode to recreate for each point pair to reduce object creation in the future
+        lineNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsLineNode")
+        # Initialise the transformation matrix and the imageData as they remain constant
+        mat = vtk.vtkMatrix4x4()
+        CriticalVolume.GetRASToIJKMatrix(mat)
+        imageData = CriticalVolume.GetImageData()
+        
+        bestLineNode = None
+        maxDistanceToCriticalStructure = -np.inf
 
-  def GetLinesE_T(self, inputEntryFiducials, outputFiducials, groupName, CriticalVolume):
-    # Pre-create a lineNode to recreate for each point pair to reduce object creation in the future
-    lineNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsLineNode")
-    # Initialise  the transformation matrix and the imageData as they remain constant
-    mat = vtk.vtkMatrix4x4()
-    CriticalVolume.GetRASToIJKMatrix(mat)
-    imageData = CriticalVolume.GetImageData()
-    
-    for entryIndex in range(inputEntryFiducials.GetNumberOfControlPoints()):
-       entryPointRAS = [0, 0, 0]
-       inputEntryFiducials.GetNthControlPointPosition(entryIndex, entryPointRAS)
-       for targetIndex in range(outputFiducials.GetNumberOfControlPoints()):
-          targetPointRAS = [0, 0, 0]
-          outputFiducials.GetNthControlPointPosition(targetIndex, targetPointRAS)
+        for entryIndex in range(inputEntryFiducials.GetNumberOfControlPoints()):
+            entryPointRAS = [0, 0, 0]
+            inputEntryFiducials.GetNthControlPointPosition(entryIndex, entryPointRAS)
+            for targetIndex in range(outputFiducials.GetNumberOfControlPoints()):
+                targetPointRAS = [0, 0, 0]
+                outputFiducials.GetNthControlPointPosition(targetIndex, targetPointRAS)
 
-          lineNode.RemoveAllControlPoints()
-          lineNode.AddControlPoint(entryPointRAS)
-          lineNode.AddControlPoint(targetPointRAS)
-          lineNode.SetAttribute("LineGroup", groupName)
-          slicer.mrmlScene.AddNode(lineNode)
+                lineNode.RemoveAllControlPoints()
+                lineNode.AddControlPoint(entryPointRAS)
+                lineNode.AddControlPoint(targetPointRAS)
+                lineNode.SetAttribute("LineGroup", groupName)
+                slicer.mrmlScene.AddNode(lineNode)
 
-          if self.checkIntersection(entryPointRAS, targetPointRAS, mat, imageData):
-             slicer.mrmlScene.RemoveNode(lineNode)
-          else:
-             lineNode.SetDisplayVisibility(1)
-             slicer.mrmlScene.Modified()
-  
-  def checkIntersection(self, startPointRAS, endPointRAS, mat, imageData):
-     # Converting the points into the IJK Space
-     startIJK = [0, 0, 0, 1]
-     endIJK = [0, 0, 0, 1]
-     mat.MultiplyPoint(startPointRAS + [1], startIJK)
-     mat.MultiplyPoint(endPointRAS + [1], endIJK)
-     # Direction of the line = end point - start point
-     directionVector = np.array(endIJK[:3]) - np.array(startIJK[:3])
-     # Magnitude of the line
-     distance = np.linalg.norm(directionVector)
-     if distance == 0:
+                if self.checkIntersection(entryPointRAS, targetPointRAS, mat, imageData):
+                    slicer.mrmlScene.RemoveNode(lineNode)
+                    continue
+
+                length = np.linalg.norm(np.array(targetPointRAS) - np.array(entryPointRAS))
+                if length > lengthThreshold:
+                    slicer.mrmlScene.RemoveNode(lineNode)
+                    continue
+
+                insertionAngle = self.calculateInsertionAngle(entryPointRAS, targetPointRAS)
+                if insertionAngle > 55:
+                    slicer.mrmlScene.RemoveNode(lineNode)
+                    continue
+
+                distanceToCriticalStructure = self.calculateDistanceToCriticalStructure(lineNode, mat, imageData)
+                if distanceToCriticalStructure > maxDistanceToCriticalStructure:
+                    if bestLineNode:
+                        slicer.mrmlScene.RemoveNode(bestLineNode)
+                    bestLineNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsLineNode")
+                    bestLineNode.Copy(lineNode)
+                    maxDistanceToCriticalStructure = distanceToCriticalStructure
+
+                slicer.mrmlScene.RemoveNode(lineNode)
+
+        if bestLineNode:
+            bestLineNode.SetDisplayVisibility(1)
+            slicer.mrmlScene.AddNode(bestLineNode)
+            slicer.mrmlScene.Modified()
+
+    def checkIntersection(self, startPointRAS, endPointRAS, mat, imageData):
+        # Converting the points into the IJK Space
+        startIJK = [0, 0, 0, 1]
+        endIJK = [0, 0, 0, 1]
+        mat.MultiplyPoint(startPointRAS + [1], startIJK)
+        mat.MultiplyPoint(endPointRAS + [1], endIJK)
+        # Direction of the line = end point - start point
+        directionVector = np.array(endIJK[:3]) - np.array(startIJK[:3])
+        # Magnitude of the line
+        distance = np.linalg.norm(directionVector)
+        if distance == 0:
+            return False
+
+        directionVector /= distance
+
+        for i in np.arange(0, distance, 0.1):
+            samplePointIJK = np.array(startIJK[:3]) + directionVector * i
+            voxelValue = imageData.GetScalarComponentAsDouble(int(samplePointIJK[0]), int(samplePointIJK[1]), int(samplePointIJK[2]), 0)
+            if voxelValue != 0:
+                return True
         return False
-     
-     directionVector /= distance
 
-     for i in np.arange(0, distance, 0.1):
-        samplePointIJK = np.array(startIJK[:3])+directionVector * i
-        voxelValue = imageData.GetScalarComponentAsDouble(int(samplePointIJK[0]), int(samplePointIJK[1]), int(samplePointIJK[2]), 0)
-        if voxelValue != 0:
-           return True
-        return False
+    def calculateInsertionAngle(self, entryPointRAS, targetPointRAS):
+        directionVector = np.array(targetPointRAS) - np.array(entryPointRAS)
+        directionVector /= np.linalg.norm(directionVector)
+        cortexNormal = np.array([0, 0, 1])  # Assuming cortex normal is along z-axis for simplicity
+        angle = np.arccos(np.clip(np.dot(directionVector, cortexNormal), -1.0, 1.0))
+        return np.degrees(angle)
 
+    def calculateDistanceToCriticalStructure(self, lineNode, mat, imageData):
+        startPointRAS = [0, 0, 0]
+        endPointRAS = [0, 0, 0]
+        lineNode.GetNthControlPointPosition(0, startPointRAS)
+        lineNode.GetNthControlPointPosition(1, endPointRAS)
+        startIJK = [0, 0, 0, 1]
+        endIJK = [0, 0, 0, 1]
+        mat.MultiplyPoint(startPointRAS + [1], startIJK)
+        mat.MultiplyPoint(endPointRAS + [1], endIJK)
+        directionVector = np.array(endIJK[:3]) - np.array(startIJK[:3])
+        distance = np.linalg.norm(directionVector)
+        if distance == 0:
+            return 0
 
+        directionVector /= distance
+        minDistance = np.inf
 
-  #def InsertionAngle():
+        for i in np.arange(0, distance, 0.1):
+            samplePointIJK = np.array(startIJK[:3]) + directionVector * i
+            voxelValue = imageData.GetScalarComponentAsDouble(int(samplePointIJK[0]), int(samplePointIJK[1]), int(samplePointIJK[2]), 0)
+            if voxelValue != 0:
+                distanceToSurface = np.linalg.norm(samplePointIJK - np.array(startIJK[:3]))
+                if distanceToSurface < minDistance:
+                    minDistance = distanceToSurface
+        return minDistance
+
 
 #
 # PathPlanningTest
@@ -420,8 +472,8 @@ class PathPlanningTest(ScriptedLoadableModuleTest):
         self.delayDisplay('Test passed! All data loaded correctly')
 
     def test_PathPlanningTestOutsidePoint(self):
-        """Here I give a point I know shold be ourside for hippocampus.
-           Hence I expect the return markupsfidicual node to be empty.
+        """Here I give a point I know should be outside for hippocampus.
+           Hence I expect the return markups fiducial node to be empty.
         """
 
         self.delayDisplay("Starting the test")
@@ -432,18 +484,17 @@ class PathPlanningTest(ScriptedLoadableModuleTest):
 
         # I am going to hard code two points -- both of which I know are not in my mask
         outsidePoints = slicer.vtkMRMLMarkupsFiducialNode()
-        outsidePoints.AddControlPoint(-1, -1, -1) # this is outside of our image bounds
+        outsidePoints.AddControlPoint(-1, -1, -1)  # this is outside of our image bounds
         cornerPoint = mask.GetImageData().GetOrigin()
-        outsidePoints.AddControlPoint(cornerPoint[0], cornerPoint[1], cornerPoint[2]) # we know our corner pixel is no 1
-    
+        outsidePoints.AddControlPoint(cornerPoint[0], cornerPoint[1], cornerPoint[2])  # we know our corner pixel is no 1
+
         #run our class
         returnedPoints = slicer.vtkMRMLMarkupsFiducialNode()
         PickPointsMatrix().run(mask, outsidePoints, returnedPoints)
-    
+
         # check if we have any returned fiducials -- this should be empty
         if (returnedPoints.GetNumberOfControlPoints() > 0):
             self.delayDisplay('Test failed. There are ' + str(returnedPoints.GetNumberOfControlPoints()) + ' return points.')
             return
 
         self.delayDisplay('Test passed! No points were returned.')
-

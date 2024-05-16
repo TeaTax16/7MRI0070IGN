@@ -77,7 +77,7 @@
        </widget>
       </item>
       <item row="4" column="1">
-       <widget class="ctkSliderWidget" name="lengthSliderWidget">
+       <widget class="ctkSliderWidget" name="lengthThreshold">
         <property name="toolTip">
          <string>Set threshold value for computing the output image. Voxels that have intensities lower than this value will set to zero.</string>
         </property>
