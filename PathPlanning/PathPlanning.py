@@ -136,6 +136,7 @@ class PathPlanningWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
 
         if self.ui.inputTargetFiducialSelector.currentNode():
             self.ui.inputTargetFiducialSelector.currentNode().SetDisplayVisibility(False)
+            self.ui.inputEntryFiducialSelector.currentNode().SetDisplayVisibility(False)
             self.ui.outputFiducialSelector.currentNode().SetDisplayVisibility(False)
 
         if not complete:
