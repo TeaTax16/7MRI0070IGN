@@ -3,8 +3,10 @@ import logging
 import os
 from typing import Annotated, Optional
 import vtk
+import SimpleITK as sitk
 import numpy as np
 import slicer
+from slicer.util import getNode
 from slicer.i18n import tr as _
 from slicer.i18n import translate
 from slicer.ScriptedLoadableModule import *
@@ -35,7 +37,7 @@ class PathPlanningParameterNode:
     inputCriticalVolume: vtkMRMLLabelMapVolumeNode # Trajectory line must avoid this label map
     inputEntryFiducials: vtkMRMLMarkupsFiducialNode # Fiducials containing Entry Points
     inputTargetFiducials: vtkMRMLMarkupsFiducialNode # Fiducials containing Target points
-    lengthThreshold: Annotated[float, WithinRange(0, 500)] = 100 # Maximum length threshold
+    lengthThreshold: Annotated[float, WithinRange(0, 100)] = 0 # Maximum length threshold
     outputFiducials: vtkMRMLMarkupsFiducialNode # Filtered Target points that are in the target label map
 
 
@@ -134,6 +136,7 @@ class PathPlanningWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
 
         if self.ui.inputTargetFiducialSelector.currentNode():
             self.ui.inputTargetFiducialSelector.currentNode().SetDisplayVisibility(False)
+            self.ui.outputFiducialSelector.currentNode().SetDisplayVisibility(False)
 
         if not complete:
             print('I encountered an error')
@@ -196,10 +199,10 @@ class PathPlanningLogic(ScriptedLoadableModuleLogic):
         return True
 
 
-class PickPointsMatrix(ScriptedLoadableModuleLogic): 
+class PickPointsMatrix(ScriptedLoadableModuleLogic):
     def __init__(self):
         self.trajectory = []
-    
+
     def run(self, inputVolume, inputFiducials, outputFiducials):
         outputFiducials.RemoveAllControlPoints()
         mat = vtk.vtkMatrix4x4()
@@ -214,80 +217,92 @@ class PickPointsMatrix(ScriptedLoadableModuleLogic):
 
             pixelValue = inputVolume.GetImageData().GetScalarComponentAsDouble(int(ind[0]), int(ind[1]), int(ind[2]), 0)
             if pixelValue == 1:
-                outputFiducials.AddControlPoint(pos[0], pos[1], pos[2])
+                outputFiducials.AddControlPoint(vtk.vtkVector3d(pos[0], pos[1], pos[2]))
 
     def GetLinesE_T(self, inputEntryFiducials, outputFiducials, groupName, CriticalVolume, lengthThreshold):
         lineNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsLineNode")
         mat = vtk.vtkMatrix4x4()
         CriticalVolume.GetRASToIJKMatrix(mat)
         imageData = CriticalVolume.GetImageData()
-        
-        bestLineNode = None
-        maxDistanceToCriticalStructure = -np.inf
-        
+    
+        maxMinDistance = -np.inf
+        bestEntryPoint = None
+        bestTargetPoint = None
+        bestEntryIndex = -1
+        bestTargetIndex = -1
+        bestLength = -1
+        bestMinDistance = -1
+    
         import time
         startTime = time.time()
         print("Time Started")
-        
-        for entryIndex in range(inputEntryFiducials.GetNumberOfControlPoints()):
+
+        numEntryPoints = inputEntryFiducials.GetNumberOfControlPoints()
+        numTargetPoints = outputFiducials.GetNumberOfControlPoints()
+        print(f"Number of entry points: {numEntryPoints}, Number of target points: {numTargetPoints}")
+
+        distanceMap = self.computeDistanceMap(CriticalVolume)
+
+        for entryIndex in range(numEntryPoints):
             entryPointRAS = [0, 0, 0]
             inputEntryFiducials.GetNthControlPointPosition(entryIndex, entryPointRAS)
-            for targetIndex in range(outputFiducials.GetNumberOfControlPoints()):
+            print("==============================")
+            print(f"E{entryIndex+1}: {entryPointRAS}")
+            print("")
+            for targetIndex in range(numTargetPoints):
                 targetPointRAS = [0, 0, 0]
                 outputFiducials.GetNthControlPointPosition(targetIndex, targetPointRAS)
+                print(f"T{targetIndex+1}: {targetPointRAS}")
 
-                lineNode.RemoveAllControlPoints()
-                lineNode.AddControlPoint(entryPointRAS)
-                lineNode.AddControlPoint(targetPointRAS)
-                lineNode.SetAttribute("LineGroup", groupName)
-                slicer.mrmlScene.AddNode(lineNode)
-                print("")
-                
-                # insertionAngle = self.calculateInsertionAngle(entryPointRAS, targetPointRAS)
-                # if insertionAngle > 55:
-                #     slicer.mrmlScene.RemoveNode(lineNode)
-                #     print(f"FAIL: Angle {insertionAngle:.2f}")
-                #     continue
-                # print(f"PASS: Angle {insertionAngle:.2f}")
-                
-                if self.checkIntersection(entryPointRAS, targetPointRAS, mat, imageData):
-                    slicer.mrmlScene.RemoveNode(lineNode)
-                    print("FAIL: Intersection")
-                    continue
-                print("PASS: No Intersection")
                 length = np.linalg.norm(np.array(targetPointRAS) - np.array(entryPointRAS))
                 if length > lengthThreshold:
-                    slicer.mrmlScene.RemoveNode(lineNode)
-                    print(f"FAIL: Length {length:.2f}")
+                    print(f"    FAIL: Length {length:.2f}")
                     continue
-                print(f"PASS: Length {length:.2f}")
+                print(f"    PASS: Length {length:.2f}")
 
-                distanceToCriticalStructure = self.calculateDistanceToCriticalStructure(lineNode, mat, imageData)
-                if distanceToCriticalStructure > maxDistanceToCriticalStructure:
-                    print("PASS: Safest Line")
-                    if bestLineNode:
-                        slicer.mrmlScene.RemoveNode(bestLineNode)
-                    bestLineNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsLineNode")
-                    bestLineNode.Copy(lineNode)
-                    maxDistanceToCriticalStructure = distanceToCriticalStructure
+                if self.checkIntersection(entryPointRAS, targetPointRAS, mat, imageData):
+                    print("    FAIL: Intersection")
+                    continue
+                print("    PASS: No Intersection")
+
+                minDistance = self.computeMinimumDistance(entryPointRAS, targetPointRAS, mat, distanceMap)
+                print(f"    Distance to Critical Structure: {minDistance:.2f}")
+
+                if minDistance > maxMinDistance:
+                    maxMinDistance = minDistance
                     bestEntryPoint = entryPointRAS
                     bestTargetPoint = targetPointRAS
-                else:
-                    print("FAIL: Not Safest Line")
-                slicer.mrmlScene.RemoveNode(lineNode)
-        if bestLineNode:
-            bestLineNode.SetDisplayVisibility(1)
-            slicer.mrmlScene.AddNode(bestLineNode)
-            slicer.mrmlScene.Modified()
-            print(f"Best Entry Point: {bestEntryPoint}")
-            print(f"Best Target Point: {bestTargetPoint}")
-            trajectoryNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLMarkupsFiducialNode", "trajectory")
-            trajectoryNode.AddControlPoint(bestEntryPoint[0], bestEntryPoint[1], bestEntryPoint[2])
-            trajectoryNode.AddControlPoint(bestTargetPoint[0], bestTargetPoint[1], bestTargetPoint[2])
+                    bestEntryIndex = entryIndex
+                    bestTargetIndex = targetIndex
+                    bestLength = length
+                    bestMinDistance = minDistance
+
+        if bestEntryPoint and bestTargetPoint:
+            lineNode.RemoveAllControlPoints()
+            lineNode.AddControlPoint(vtk.vtkVector3d(bestEntryPoint[0], bestEntryPoint[1], bestEntryPoint[2]))
+            lineNode.AddControlPoint(vtk.vtkVector3d(bestTargetPoint[0], bestTargetPoint[1], bestTargetPoint[2]))
+            lineNode.SetAttribute("LineGroup", groupName)
+            slicer.mrmlScene.AddNode(lineNode)
             
+            bestFiducialNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLMarkupsFiducialNode")
+            bestFiducialNode.SetName("Trajectory")
+            slicer.mrmlScene.AddNode(bestFiducialNode)
+            bestFiducialNode.AddControlPoint(bestEntryPoint)
+            bestFiducialNode.AddControlPoint(bestTargetPoint)
+            
+            print("==============================")
+            print(f"Best Line Details:")
+            print(f"E {bestEntryIndex+1}, {bestEntryPoint}")
+            print(f"T {bestTargetIndex+1}, {bestTargetPoint}")
+            print(f"L: {bestLength:.2f}")
+            print(f"D: {bestMinDistance:.2f}")
+            print("")
 
         stopTime = time.time()
         print(f"Processing completed in {stopTime-startTime:.2f} seconds")
+        
+        
+        
 
     def checkIntersection(self, startPointRAS, endPointRAS, mat, imageData):
         startIJK = [0, 0, 0, 1]
@@ -309,40 +324,58 @@ class PickPointsMatrix(ScriptedLoadableModuleLogic):
             
         return False
 
-    def calculateInsertionAngle(self, entryPointRAS, targetPointRAS):
+    def computeDistanceMap(self, volume):
+        import sitkUtils
+        sitkImage = sitkUtils.PullVolumeFromSlicer(volume.GetID())
+        sitkImage = sitk.Cast(sitkImage, sitk.sitkUInt8)  # Convert to a supported pixel type
+        distanceFilter = sitk.DanielssonDistanceMapImageFilter()
+        distanceMap = distanceFilter.Execute(sitkImage)
+        return sitk.GetArrayFromImage(distanceMap)
 
-        directionVector = np.array(targetPointRAS) - np.array(entryPointRAS)
-        directionVector /= np.linalg.norm(directionVector)
-        cortexNormal = np.array([0, 0, 1])
-        angle = np.arccos(np.clip(np.dot(directionVector, cortexNormal), -1.0, 1.0))
-        return np.degrees(angle)
-
-    def calculateDistanceToCriticalStructure(self, lineNode, mat, imageData):
-
-        startPointRAS = [0, 0, 0]
-        endPointRAS = [0, 0, 0]
-        lineNode.GetNthControlPointPosition(0, startPointRAS)
-        lineNode.GetNthControlPointPosition(1, endPointRAS)
+    def computeMinimumDistance(self, startPointRAS, endPointRAS, mat, distanceMap):
+    # Convert RAS points to IJK coordinates
         startIJK = [0, 0, 0, 1]
         endIJK = [0, 0, 0, 1]
         mat.MultiplyPoint(startPointRAS + [1], startIJK)
         mat.MultiplyPoint(endPointRAS + [1], endIJK)
-        directionVector = np.array(endIJK[:3]) - np.array(startIJK[:3])
-        distance = np.linalg.norm(directionVector)
-        if distance == 0:
-            return 0
+        startIJK = startIJK[:3]
+        endIJK = endIJK[:3]
 
-        directionVector /= distance
-        minDistance = np.inf
+    # Compute direction vector and distance
+        directionVector = np.array(endIJK) - np.array(startIJK)
+        totalDistance = np.linalg.norm(directionVector)
+    
+        if totalDistance == 0:
+            return np.inf
 
-        for i in np.arange(0, distance, 0.1):
-            samplePointIJK = np.array(startIJK[:3]) + directionVector * i
-            voxelValue = imageData.GetScalarComponentAsDouble(int(samplePointIJK[0]), int(samplePointIJK[1]), int(samplePointIJK[2]), 0)
-            if voxelValue != 0:
-                distanceToSurface = np.linalg.norm(samplePointIJK - np.array(startIJK[:3]))
-                if distanceToSurface < minDistance:
-                    minDistance = distanceToSurface
+        directionVector /= totalDistance  # Normalize the direction vector
+        minDistance = np.inf  # Initialize minimum distance to infinity
+
+    # Iterate over the points along the line segment
+        for i in np.arange(0, totalDistance, 0.1):
+            samplePointIJK = np.array(startIJK) + directionVector * i
+            ijk = np.round(samplePointIJK).astype(int)
+        
+        # Ensure the point is within the bounds of the distance map
+            if np.any(ijk < 0) or np.any(ijk >= distanceMap.shape):
+                continue
+        
+        # Get the distance to the nearest critical structure at this point
+            voxelDistance = distanceMap[ijk[2], ijk[1], ijk[0]]
+        
+        # Update the minimum distance if a smaller value is found
+            if voxelDistance < minDistance:
+                minDistance = voxelDistance
+
         return minDistance
+
+
+    # def calculateInsertionAngle(self, entryPointRAS, targetPointRAS):
+    #     directionVector = np.array(targetPointRAS) - np.array(entryPointRAS)
+    #     directionVector /= np.linalg.norm(directionVector)
+    #     cortexNormal = np.array([0, 0, 1])
+    #     angle = np.arccos(np.clip(np.dot(directionVector, cortexNormal), -1.0, 1.0))
+    #     return np.degrees(angle)
 
 
 class PathPlanningTest(ScriptedLoadableModuleTest):
@@ -360,7 +393,7 @@ class PathPlanningTest(ScriptedLoadableModuleTest):
         print("Starting test points outside mask.")
         #
         # get our mask image node
-        mask = slicer.util.getNode('r_hippoTest')
+        mask = slicer.util.getNode("/Users/takrim/Library/Mobile Documents/com~apple~CloudDocs/University/MSc Healthcare Technologies/Image Guided Navigation/Submissions/Image Data/BrainParcellation/r_hippo.nii.gz")
 
         # I am going to hard code two points -- both of which I know are not in my mask
         outsidePoints = slicer.vtkMRMLMarkupsFiducialNode()
