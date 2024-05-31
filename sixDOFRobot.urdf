@@ -1,0 +1,268 @@
+<?xml version="1.0" ?>
+<robot name="sixDOFRobot">
+    <!-- Base Link -->
+    <link name="base_link">
+        <visual>
+            <geometry>
+                <box size="0.5 0.5 0.5" />
+            </geometry>
+        </visual>
+        <collision>
+            <geometry>
+                <box size="0.5 0.5 0.5" />
+            </geometry>
+        </collision>
+        <inertial>
+            <mass value="0.1" />
+            <origin xyz="0 0 0" rpy="0 0 0" />
+            <inertia ixx="0.03" iyy="0.03" izz="0.03" ixy="0.0" ixz="0.0" iyz="0.0" />
+        </inertial>
+    </link>
+    <!-- Link X (Prismatic for X-axis movement) -->
+    <link name="link_x">
+        <visual>
+            <geometry>
+                <box size="2 0.2 0.2" />
+            </geometry>
+        </visual>
+        <collision>
+            <geometry>
+                <box size="2 0.2 0.2" />
+            </geometry>
+        </collision>
+        <inertial>
+            <mass value="0.1" />
+            <origin xyz="0 0 0" rpy="0 0 0" />
+            <inertia ixx="0.03" iyy="0.03" izz="0.03" ixy="0.0" ixz="0.0" iyz="0.0" />
+        </inertial>
+    </link>
+    <!-- Link Y (Prismatic for Y-axis movement) -->
+    <link name="link_y">
+        <visual>
+            <geometry>
+                <box size="0.2 2 0.2" />
+            </geometry>
+        </visual>
+        <collision>
+            <geometry>
+                <box size="0.2 2 0.2" />
+            </geometry>
+        </collision>
+        <inertial>
+            <mass value="0.1" />
+            <origin xyz="0 0 0" rpy="0 0 0" />
+            <inertia ixx="0.03" iyy="0.03" izz="0.03" ixy="0.0" ixz="0.0" iyz="0.0" />
+        </inertial>
+    </link>
+    <!-- Link Z (Prismatic for Z-axis movement) -->
+    <link name="link_z">
+        <visual>
+            <geometry>
+                <box size="0.2 0.2 2" />
+            </geometry>
+        </visual>
+        <collision>
+            <geometry>
+                <box size="0.2 0.2 2" />
+            </geometry>
+        </collision>
+        <inertial>
+            <mass value="0.1" />
+            <origin xyz="0 0 0" rpy="0 0 0" />
+            <inertia ixx="0.03" iyy="0.03" izz="0.03" ixy="0.0" ixz="0.0" iyz="0.0" />
+        </inertial>
+    </link>
+    <!-- Link Roll (Revolute for Roll rotation) -->
+    <link name="link_roll">
+        <visual>
+            <geometry>
+                <box size="1 0.15 0.15" />
+            </geometry>
+        </visual>
+        <collision>
+            <geometry>
+                <box size="1 0.15 0.15" />
+            </geometry>
+        </collision>
+        <inertial>
+            <mass value="0.1" />
+            <origin xyz="0 0 0" rpy="0 0 0" />
+            <inertia ixx="0.03" iyy="0.03" izz="0.03" ixy="0.0" ixz="0.0" iyz="0.0" />
+        </inertial>
+    </link>
+    <!-- Link Pitch (Revolute for Pitch rotation) -->
+    <link name="link_pitch">
+        <visual>
+            <geometry>
+                <box size="0.15 1 0.15" />
+            </geometry>
+        </visual>
+        <collision>
+            <geometry>
+                <box size="0.15 1 0.15" />
+            </geometry>
+        </collision>
+        <inertial>
+            <mass value="0.1" />
+            <origin xyz="0 0 0" rpy="0 0 0" />
+            <inertia ixx="0.03" iyy="0.03" izz="0.03" ixy="0.0" ixz="0.0" iyz="0.0" />
+        </inertial>
+    </link>
+    <!-- Link Yaw (Revolute for Yaw rotation) -->
+    <link name="link_yaw">
+        <visual>
+            <geometry>
+                <box size="0.15 0.15 1" />
+            </geometry>
+        </visual>
+        <collision>
+            <geometry>
+                <box size="0.15 0.15 1" />
+            </geometry>
+        </collision>
+        <inertial>
+            <mass value="0.1" />
+            <origin xyz="0 0 0" rpy="0 0 0" />
+            <inertia ixx="0.03" iyy="0.03" izz="0.03" ixy="0.0" ixz="0.0" iyz="0.0" />
+        </inertial>
+    </link>
+    <!-- End Effector -->
+    <link name="end_effector">
+        <visual>
+            <geometry>
+                <box size="0.2 0.2 0.2" />
+            </geometry>
+        </visual>
+        <collision>
+            <geometry>
+                <box size="0.2 0.2 0.2" />
+            </geometry>
+        </collision>
+        <inertial>
+            <mass value="0.1" />
+            <origin xyz="0 0 0" rpy="0 0 0" />
+            <inertia ixx="0.03" iyy="0.03" izz="0.03" ixy="0.0" ixz="0.0" iyz="0.0" />
+        </inertial>
+    </link>
+    <!-- Joints Configuration -->
+    <!-- Base to Link X (Prismatic Joint for X-axis) -->
+    <joint name="base_to_link_x" type="prismatic">
+        <parent link="base_link" />
+        <child link="link_x" />
+        <origin xyz="0.25 0 0" />
+        <axis xyz="1 0 0" />
+        <limit lower="-1" upper="1" effort="100" velocity="0.5" />
+    </joint>
+    <!-- Link X to Link Y (Prismatic Joint for Y-axis) -->
+    <joint name="link_x_to_link_y" type="prismatic">
+        <parent link="link_x" />
+        <child link="link_y" />
+        <origin xyz="1 0 0" />
+        <axis xyz="0 1 0" />
+        <limit lower="-1" upper="1" effort="100" velocity="0.5" />
+    </joint>
+    <!-- Link Y to Link Z (Prismatic Joint for Z-axis) -->
+    <joint name="link_y_to_link_z" type="prismatic">
+        <parent link="link_y" />
+        <child link="link_z" />
+        <origin xyz="0 1 0" />
+        <axis xyz="0 0 1" />
+        <limit lower="-1" upper="1" effort="100" velocity="0.5" />
+    </joint>
+    <!-- Link Z to Link Roll (Revolute Joint for Roll rotation) -->
+    <joint name="link_z_to_link_roll" type="revolute">
+        <parent link="link_z" />
+        <child link="link_roll" />
+        <origin xyz="0 0 1" />
+        <axis xyz="1 0 0" />
+        <limit lower="-3.14" upper="3.14" effort="100" velocity="1.0" />
+    </joint>
+    <!-- Link Roll to Link Pitch (Revolute Joint for Pitch rotation) -->
+    <joint name="link_roll_to_link_pitch" type="revolute">
+        <parent link="link_roll" />
+        <child link="link_pitch" />
+        <origin xyz="0.5 0 0" />
+        <axis xyz="0 1 0" />
+        <limit lower="-3.14" upper="3.14" effort="100" velocity="1.0" />
+    </joint>
+    <!-- Link Pitch to Link Yaw (Revolute Joint for Yaw rotation) -->
+    <joint name="link_pitch_to_link_yaw" type="revolute">
+        <parent link="link_pitch" />
+        <child link="link_yaw" />
+        <origin xyz="0 0.5 0" />
+        <axis xyz="0 0 1" />
+        <limit lower="-3.14" upper="3.14" effort="100" velocity="1.0" />
+    </joint>
+    <!-- Link Yaw to End Effector (Fixed Joint) -->
+    <joint name="link_yaw_to_end_effector" type="fixed">
+        <parent link="link_yaw" />
+        <child link="end_effector" />
+        <origin xyz="0 0 0.5" />
+    </joint>
+    <transmission name="trans_base_to_link_x">
+        <type>transmission_interface/SimpleTransmission</type>
+        <joint name="base_to_link_x">
+            <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
+        </joint>
+        <actuator name="base_to_link_x_motor">
+            <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
+            <mechanicalReduction>1</mechanicalReduction>
+        </actuator>
+    </transmission>
+    <transmission name="trans_link_x_to_link_y">
+        <type>transmission_interface/SimpleTransmission</type>
+        <joint name="link_x_to_link_y">
+            <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
+        </joint>
+        <actuator name="link_x_to_link_y_motor">
+            <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
+            <mechanicalReduction>1</mechanicalReduction>
+        </actuator>
+    </transmission>
+    <transmission name="trans_link_y_to_link_z">
+        <type>transmission_interface/SimpleTransmission</type>
+        <joint name="link_y_to_link_z">
+            <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
+        </joint>
+        <actuator name="link_y_to_link_z_motor">
+            <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
+            <mechanicalReduction>1</mechanicalReduction>
+        </actuator>
+    </transmission>
+    <transmission name="trans_link_z_to_link_roll">
+        <type>transmission_interface/SimpleTransmission</type>
+        <joint name="link_z_to_link_roll">
+            <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
+        </joint>
+        <actuator name="link_z_to_link_roll_motor">
+            <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
+            <mechanicalReduction>1</mechanicalReduction>
+        </actuator>
+    </transmission>
+    <transmission name="trans_link_roll_to_link_pitch">
+        <type>transmission_interface/SimpleTransmission</type>
+        <joint name="link_roll_to_link_pitch">
+            <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
+        </joint>
+        <actuator name="link_roll_to_link_pitch_motor">
+            <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
+            <mechanicalReduction>1</mechanicalReduction>
+        </actuator>
+    </transmission>
+    <transmission name="trans_link_pitch_to_link_yaw">
+        <type>transmission_interface/SimpleTransmission</type>
+        <joint name="link_pitch_to_link_yaw">
+            <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
+        </joint>
+        <actuator name="link_pitch_to_link_yaw_motor">
+            <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
+            <mechanicalReduction>1</mechanicalReduction>
+        </actuator>
+    </transmission>
+    <gazebo>
+        <plugin name="gazebo_ros_control">
+            <robotNamespace>/</robotNamespace>
+        </plugin>
+    </gazebo>
+</robot>
+

@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--This does not replace URDF, and is not an extension of URDF.
+    This is a format for representing semantic information about the robot structure.
+    A URDF file must exist for this robot as well, where the joints and the links that are referenced are defined
+-->
+<robot name="sixDOFRobot">
+    <!--GROUPS: Representation of a set of joints and links. This can be useful for specifying DOF to plan for, defining arms, end effectors, etc-->
+    <!--LINKS: When a link is specified, the parent joint of that link (if it exists) is automatically included-->
+    <!--JOINTS: When a joint is specified, the child link of that joint (which will always exist) is automatically included-->
+    <!--CHAINS: When a chain is specified, all the links along the chain (including endpoints) are included in the group. Additionally, all the joints that are parents to included links are also included. This means that joints along the chain and the parent joint of the base link are included in the group-->
+    <!--SUBGROUPS: Groups can also be formed by referencing to already defined group names-->
+    <group name="robot_group">
+        <joint name="base_to_link_x"/>
+        <joint name="link_x_to_link_y"/>
+        <joint name="link_y_to_link_z"/>
+        <joint name="link_z_to_link_roll"/>
+        <joint name="link_roll_to_link_pitch"/>
+        <joint name="link_pitch_to_link_yaw"/>
+        <joint name="link_yaw_to_end_effector"/>
+    </group>
+    <!--GROUP STATES: Purpose: Define a named state for a particular group, in terms of joint values. This is useful to define states like 'folded arms'-->
+    <group_state name="home" group="robot_group">
+        <joint name="base_to_link_x" value="1"/>
+        <joint name="link_pitch_to_link_yaw" value="0"/>
+        <joint name="link_roll_to_link_pitch" value="0"/>
+        <joint name="link_x_to_link_y" value="1"/>
+        <joint name="link_y_to_link_z" value="1"/>
+        <joint name="link_z_to_link_roll" value="0"/>
+    </group_state>
+    <!--END EFFECTOR: Purpose: Represent information about an end effector.-->
+    <end_effector name="end_effector" parent_link="base_link" group="robot_group"/>
+    <!--DISABLE COLLISIONS: By default it is assumed that any link of the robot could potentially come into collision with any other link in the robot. This tag disables collision checking between a specified pair of links. -->
+    <disable_collisions link1="base_link" link2="link_pitch" reason="Never"/>
+    <disable_collisions link1="base_link" link2="link_x" reason="Adjacent"/>
+    <disable_collisions link1="base_link" link2="link_yaw" reason="Never"/>
+    <disable_collisions link1="end_effector" link2="link_pitch" reason="Never"/>
+    <disable_collisions link1="end_effector" link2="link_roll" reason="Never"/>
+    <disable_collisions link1="end_effector" link2="link_yaw" reason="Adjacent"/>
+    <disable_collisions link1="link_pitch" link2="link_roll" reason="Adjacent"/>
+    <disable_collisions link1="link_pitch" link2="link_x" reason="Never"/>
+    <disable_collisions link1="link_pitch" link2="link_y" reason="Never"/>
+    <disable_collisions link1="link_pitch" link2="link_yaw" reason="Adjacent"/>
+    <disable_collisions link1="link_pitch" link2="link_z" reason="Never"/>
+    <disable_collisions link1="link_roll" link2="link_yaw" reason="Never"/>
+    <disable_collisions link1="link_roll" link2="link_z" reason="Adjacent"/>
+    <disable_collisions link1="link_x" link2="link_y" reason="Adjacent"/>
+    <disable_collisions link1="link_y" link2="link_z" reason="Adjacent"/>
+</robot>

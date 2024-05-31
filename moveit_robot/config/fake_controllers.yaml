@@ -1,0 +1,13 @@
+controller_list:
+  - name: fake_robot_group_controller
+    type: $(arg fake_execution_type)
+    joints:
+      - base_to_link_x
+      - link_x_to_link_y
+      - link_y_to_link_z
+      - link_z_to_link_roll
+      - link_roll_to_link_pitch
+      - link_pitch_to_link_yaw
+initial:  # Define initial robot poses per group
+  - group: robot_group
+    pose: home
